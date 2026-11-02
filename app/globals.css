@@ -1,0 +1,220 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── Palette ─────────────────────────────────────────────── */
+  --color-cream: #f7f1e6;
+  --color-cream-dark: #eee5d2;
+  --color-paper: #fcf9f1;
+  --color-ink: #262118;
+  --color-ink-soft: #6b6354;
+  --color-terracotta: #bc5b34;
+  --color-terracotta-deep: #98431f;
+  --color-terracotta-tint: #f0d6c4;
+  --color-olive: #5c6b4a;
+  --color-forest: #3b4634;
+  --color-night: #211d15;
+  --color-night-2: #2d2820;
+  --color-sun: #dfa45c;
+
+  /* Rust editorial suite (therapist bio + CTA sections) */
+  --color-rust: #7b3b26;
+  --color-rust-deep: #63291a;
+  --color-mustard: #d29b5a;
+  --color-gold: #b38200;
+  --color-creamwarm: #f5ebe6;
+  --color-cocoa: #4a2a1b;
+
+  /* Sage qualifications + olive approach sections */
+  --color-sage: #99a69c;
+  --color-charcoal: #2a2a2a;
+  --color-terradark: #5c2b1d;
+  --color-sand: #ded3c4;
+  --color-sand-deep: #d2c4af;
+  --color-olivegreen: #6b6f38;
+
+  /* ── Type (Urdu) ─────────────────────────────────────────── */
+  --font-sans: var(--font-urdu-body), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-urdu-display), serif;
+
+  /* ── Motion ──────────────────────────────────────────────── */
+  --animate-marquee: marquee 42s linear infinite;
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-float-slow: float 11s ease-in-out infinite;
+
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0) rotate(-2deg);
+    }
+    50% {
+      transform: translateY(-10px) rotate(2deg);
+    }
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .animate-marquee,
+  .animate-float,
+  .animate-float-slow {
+    animation: none !important;
+  }
+}
+
+body {
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+/* ---------- Urdu / RTL typography ---------- */
+
+/* Nastaliq script descends deeply below the baseline; tight line-heights
+   (leading-tight/none) clip the glyphs. Guarantee a safe minimum wherever
+   the display font is used — unlayered so it wins over utility classes. */
+.font-display {
+  line-height: 1.9 !important;
+}
+
+/* Tighter display leading for single-line headings that must sit inside
+   a fixed-height band (e.g. the olive approach banner) — Nastaliq at 1.9
+   is too tall for them. Must come after .font-display to win. */
+.font-display-snug {
+  line-height: 1.55 !important;
+}
+
+/* Naskh body text also needs slightly more room than Latin defaults. */
+html[dir="rtl"] body {
+  line-height: 1.9;
+}
+
+/* Letter-spacing is meaningless for connected Arabic script and breaks it. */
+html[dir="rtl"] * {
+  letter-spacing: 0 !important;
+}
+
+/* Slightly larger base size: Naskh renders small compared to Latin faces. */
+html[dir="rtl"] {
+  font-size: 106%;
+}
+
+::selection {
+  background: var(--color-terracotta);
+  color: var(--color-cream);
+}
+
+/* Hand-drawn underline used under display headings */
+.marker-underline {
+  background-image: linear-gradient(
+    to left,
+    var(--color-terracotta),
+    var(--color-terracotta)
+  );
+  background-repeat: no-repeat;
+  background-size: 100% 0.14em;
+  background-position: 100% 92%;
+}
+
+/* ---------- Blog article body (CMS markdown) — brand typography ---------- */
+.prose-blog {
+  color: #1a1a1a;
+  font-size: 1.0625rem;
+  line-height: 2;
+}
+.prose-blog > * + * {
+  margin-top: 1.25em;
+}
+.prose-blog h2 {
+  font-family: var(--font-urdu-display), serif;
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: #5d1f13;
+  margin-top: 2em;
+  scroll-margin-top: 6rem;
+  line-height: 2.1;
+}
+.prose-blog h3 {
+  font-family: var(--font-urdu-display), serif;
+  font-size: 1.375rem;
+  font-weight: 600;
+  color: #5d1f13;
+  margin-top: 1.6em;
+  scroll-margin-top: 6rem;
+  line-height: 2;
+}
+.prose-blog h4 {
+  font-weight: 700;
+  color: #5d1f13;
+}
+.prose-blog a {
+  color: #a8532b;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.prose-blog a:hover {
+  color: #8f4423;
+}
+.prose-blog ul,
+.prose-blog ol {
+  padding-right: 1.4em;
+  padding-left: 0;
+}
+.prose-blog ul {
+  list-style: disc;
+}
+.prose-blog ol {
+  list-style: decimal;
+}
+.prose-blog li + li {
+  margin-top: 0.5em;
+}
+.prose-blog blockquote {
+  border-right: 3px solid #a8532b;
+  border-left: none;
+  background: #f3ede5;
+  border-radius: 0.75rem 0 0 0.75rem;
+  padding: 0.9em 1.25em;
+  font-style: normal;
+  color: #5d1f13;
+}
+.prose-blog img {
+  border-radius: 1rem;
+  width: 100%;
+  height: auto;
+}
+.prose-blog code {
+  background: #f3ede5;
+  border-radius: 0.375rem;
+  padding: 0.15em 0.4em;
+  font-size: 0.875em;
+}
+.prose-blog pre {
+  background: #2b1a14;
+  color: #f5efe6;
+  border-radius: 0.75rem;
+  padding: 1.25em;
+  overflow-x: auto;
+}
+.prose-blog pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+.prose-blog hr {
+  border-color: rgba(0, 0, 0, 0.1);
+}

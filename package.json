@@ -1,0 +1,42 @@
+{
+  "name": "my-kahani-project",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "booking:check": "node scripts/booking-check.mjs",
+    "test": "node --experimental-strip-types --test tests/attribution.test.mjs tests/scheduling.test.mjs tests/conversions.test.mjs tests/leads.test.mjs tests/landing.test.mjs tests/googleAds.test.mjs tests/automation.test.mjs tests/blog-cms.test.mjs tests/marketing-api.test.mjs"
+  },
+  "allowScripts": {
+    "unrs-resolver@1.12.2": true
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^5.9.1",
+    "@stripe/react-stripe-js": "^3.11.0",
+    "@stripe/stripe-js": "^4.10.0",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.116.0",
+    "isomorphic-dompurify": "^3.19.0",
+    "lucide-react": "^1.35.0",
+    "marked": "^18.1.1",
+    "next": "16.3.3",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-hook-form": "^7.86.0",
+    "stripe": "^17.7.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "16.3.3",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

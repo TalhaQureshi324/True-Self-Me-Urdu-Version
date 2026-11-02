@@ -1,0 +1,57 @@
+import Image from "next/image";
+import { SectionHeading } from "@/components/ui/primitives";
+import { about } from "@/lib/content";
+
+/**
+ * Section 2 — About: text left, inset portrait right. The grunge
+ * splash tucks behind the portrait's top-right corner — half on
+ * the photo, half off, always underneath it.
+ */
+export default function About() {
+  return (
+    <section id="about" className="relative scroll-mt-24 overflow-x-clip bg-[#5C3A26]">
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-[url('/New%20images/aBOUT_TRUE_SELF_ME_BACKGROUND.png')] bg-repeat"
+      />
+      <div className="relative mx-auto grid max-w-7xl gap-14 px-5 py-20 sm:px-8 lg:grid-cols-2 lg:gap-20 lg:py-28">
+        {/* Copy */}
+        <div>
+          <SectionHeading eyebrow={about.eyebrow} title={about.title} dark />
+          <p className="mt-6 text-lg leading-relaxed font-bold text-[#F5EBE6]">
+            {about.lead}
+          </p>
+          <div className="mt-5 space-y-5 text-base leading-relaxed text-[#F5EBE6]/80">
+            {about.paragraphs.map((p) => (
+              <p key={p.slice(0, 24)}>{p}</p>
+            ))}
+          </div>
+        </div>
+
+        {/* Inset portrait + grunge splash */}
+        <div className="px-6 pt-8 pb-6 sm:px-10 lg:px-10">
+          <div className="relative">
+            {/* splash sits behind the photo, straddling its top-right corner */}
+            <Image
+              src="/images/dad_block_extra_design_trim.webp"
+              alt=""
+              aria-hidden="true"
+              width={154}
+              height={247}
+              className="pointer-events-none absolute top-0 left-0 z-0 w-[30%] -translate-x-1/2 -translate-y-1/2 select-none"
+            />
+            <div className="relative z-10 aspect-[3/4] overflow-hidden rounded-3xl shadow-[0_26px_50px_-28px_rgba(38,33,24,0.45)]">
+            <Image
+              src="/images/ABOUT-1.jpg"
+              alt="غروبِ آفتاب میں ایک باپ اور اس کا ننھا بیٹا ہاتھ میں ہاتھ ڈالے درختوں سے گھرے راستے پر چلتے ہوئے"
+              fill
+              sizes="(min-width: 1024px) 45vw, 90vw"
+              className="object-cover"
+            />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}

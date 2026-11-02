@@ -1,0 +1,22 @@
+/**
+ * Site-wide configuration — My Kahani (اردو).
+ * PLACEHOLDER details — swap phone, email and address with your own.
+ */
+export const site = {
+  url: "https://mykahani.com",
+  name: "My Kahani",
+  tagline: "کوچنگ اور رہنمائی",
+  city: "Austin, Texas",
+  addressLines: ["123 Placeholder St, Suite 4", "Austin, TX 78704"],
+  phone: "1 (469) 935-1307",
+  phoneHref: "tel:+14699351307",
+  email: "hello@trueselfme.example.com",
+  hours: "پیر تا جمعہ · صبح 9:00 – شام 6:00 (وسطی امریکی وقت)",
+  virtual: "پورے ریاستہائے متحدہ امریکہ میں آن لائن سیشن",
+  // Temporary map location (user-supplied link) — replace with the
+  // practice's real coordinates or street address when finalized.
+  mapQuery: "43.6548253,-79.388447",
+  mapZoom: 15,
+  copyrightName: "My Kahani",
+  credits: "محبت سے ڈیزائن اور تیار کردہ",
+};

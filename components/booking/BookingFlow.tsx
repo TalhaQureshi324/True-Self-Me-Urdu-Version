@@ -1,0 +1,531 @@
+"use client";
+
+import { useState } from "react";
+import { ArrowLeft, CalendarDays, CheckCircle2, Clock, Lock } from "lucide-react";
+import CustomScheduler, {
+  formatDateLong,
+  formatTimeIn,
+  type SlotOption,
+} from "./CustomScheduler";
+import BookingConfirmation from "./BookingConfirmation";
+import CardOnFileStep from "./CardOnFileStep";
+import PromoCodeInput, { promoDiscountCents, type AppliedPromo } from "./PromoCodeInput";
+import { trackEvent } from "@/lib/analytics";
+import {
+  BUNDLE4_LABEL,
+  BUNDLE4_PRICE_CENTS,
+  BUNDLE4_SESSIONS,
+  priceCentsFor,
+  packageLabel,
+  type BookingPackage,
+} from "@/lib/pricing.ts";
+
+/**
+ * The booking interaction shell: a four-stage state machine with a
+ * persistent stepper (left) and a dynamic stage container (right).
+ * Stage 1 — live availability (in-house scheduler).
+ * Stage 2 — streamlined intake (first/last name, email, phone).
+ * Stage 3 — card-on-file consent + Stripe-hosted payment
+ *           profile form (server-verified), which also performs the
+ *           database-checked hold → confirmed conversion.
+ * Stage 4 — confirmation + .ics calendar download.
+ */
+
+const STAGES = [
+  { id: 1, label: "تاریخ اور وقت منتخب کریں" },
+  { id: 2, label: "آپ کی تفصیلات" },
+  { id: 3, label: "جائزہ اور تصدیق" },
+  { id: 4, label: "تصدیق" },
+] as const;
+
+type Hold = { booking_id: string; expires_at: string; manage_token: string };
+
+export default function BookingFlow({
+  initialPackage = "single",
+}: {
+  /** Tier preselected by a promotional CTA (banner / welcome modal). */
+  initialPackage?: BookingPackage;
+}) {
+  const [stage, setStage] = useState<1 | 2 | 3 | 4>(1);
+  const [selected, setSelected] = useState<SlotOption | null>(null);
+  const [pkg, setPkg] = useState<BookingPackage>(initialPackage);
+  const [hold, setHold] = useState<Hold | null>(null);
+  const [holdError, setHoldError] = useState<string | null>(null);
+  const [continuing, setContinuing] = useState(false);
+  const [fields, setFields] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+  });
+  const [bookingRef, setBookingRef] = useState<string | null>(null);
+  const [promo, setPromo] = useState<AppliedPromo | null>(null);
+
+  const detailsValid =
+    fields.firstName.trim() !== "" &&
+    fields.lastName.trim() !== "" &&
+    /.+@.+\..+/.test(fields.email) &&
+    fields.phone.trim() !== "";
+
+  /** Creates the 10-minute database hold for the chosen slot. */
+  async function createHold(slot: SlotOption) {
+    setHoldError(null);
+    setContinuing(true);
+    try {
+      const res = await fetch("/api/booking/hold", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slot_start: slot.start,
+          slot_end: slot.end,
+          package: pkg,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setHoldError(
+          data.error ?? "یہ وقت محفوظ نہیں ہو سکا۔ براہ کرم کوئی اور وقت منتخب کریں۔",
+        );
+        return;
+      }
+      setHold({
+        booking_id: data.booking_id,
+        expires_at: data.hold.expires_at,
+        manage_token: data.manage_token,
+      });
+      setStage(2);
+    } catch {
+      setHoldError("نیٹ ورک کی خرابی۔ براہ کرم دوبارہ کوشش کریں۔");
+    } finally {
+      setContinuing(false);
+    }
+  }
+
+  const slotLabel =
+    selected !== null
+      ? `${formatDateLong(chicagoDateOf(selected.start))}، ${formatTimeIn(
+          selected.start,
+        )} — وسطی امریکی وقت (CT)`
+      : "";
+
+  return (
+    <div className="grid gap-10 md:grid-cols-[260px_minmax(0,1fr)] md:gap-12">
+      {/* Left rail — stepper, session summary, hold status, terms */}
+      <aside className="space-y-8">
+        <ol className="space-y-1">
+          {STAGES.map(({ id, label }) => {
+            const state = id === stage ? "current" : id < stage ? "done" : "upcoming";
+            return (
+              <li
+                key={id}
+                aria-current={state === "current" ? "step" : undefined}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm ${
+                  state === "current"
+                    ? "bg-[#5D1F13]/[0.06] font-bold text-[#5D1F13]"
+                    : state === "done"
+                      ? "text-[#1A1A1A]"
+                      : "text-[#1A1A1A]/45"
+                }`}
+              >
+                <span
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs ${
+                    state === "current"
+                      ? "border-[#A8532B] bg-[#A8532B] text-white"
+                      : state === "done"
+                        ? "border-[#1A1A1A]/25 bg-[#1A1A1A] text-white"
+                        : "border-black/[0.08] bg-white"
+                  }`}
+                >
+                  {state === "done" ? <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> : id}
+                </span>
+                {label}
+              </li>
+            );
+          })}
+        </ol>
+
+        {/* Session summary */}
+        <div className="border-t border-black/[0.08] pt-6">
+          <p className="text-xs font-bold text-[#A8532B]">
+            سیشن کا خلاصہ
+          </p>
+          <p className="mt-3 text-sm font-semibold text-[#1A1A1A]">
+            {packageLabel(pkg)}
+          </p>
+          {selected ? (
+            <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-[#1A1A1A]/75">
+              <CalendarDays className="h-3.5 w-3.5 text-[#A8532B]" aria-hidden="true" />
+              {slotLabel}
+            </p>
+          ) : (
+            <p className="mt-1 text-sm text-[#1A1A1A]/60">
+              آن لائن سیشن — پورے ملک میں دستیاب۔
+            </p>
+          )}
+          <div className="mt-3 space-y-1 rounded-lg bg-[#5D1F13]/[0.06] px-4 py-3 text-xs font-bold text-[#5D1F13]">
+            {pkg === "bundle4" ? (
+              <>
+                <p className="flex items-center justify-between">
+                  <span className="text-[#1A1A1A]/60">سیشن پیکج</span>
+                  <span>${(BUNDLE4_PRICE_CENTS / 100).toFixed(2)}</span>
+                </p>
+                <p className="flex items-center justify-between">
+                  <span className="text-[#1A1A1A]/60">کل قیمت</span>
+                  <span>${(BUNDLE4_PRICE_CENTS / 100).toFixed(2)}</span>
+                </p>
+                <p className="text-[#1A1A1A]/55">
+                  {BUNDLE4_SESSIONS} آن لائن سیشن × $50.00 فی سیشن
+                </p>
+              </>
+            ) : (
+              <p className="flex items-center justify-between">
+                <span className="text-[#1A1A1A]/60">سیشن فیس</span>
+                <span>${(priceCentsFor(pkg) / 100).toFixed(2)}</span>
+              </p>
+            )}
+            <p className="flex items-center justify-between border-t border-[#5D1F13]/[0.12] pt-1">
+              <span className="inline-flex items-center gap-2 text-[#1A1A1A]/60">
+                <Lock className="h-3 w-3" aria-hidden="true" />
+                آج قابل ادائیگی (کارڈ اتھارائزیشن)
+              </span>
+              <span>$0.00</span>
+            </p>
+          </div>
+        </div>
+
+        <p className="border-t border-black/[0.08] pt-6 text-xs leading-relaxed text-[#1A1A1A]/55">
+          سیشن سے 24 گھنٹے قبل منسوخی مفت ہے۔ آپ کے کارڈ کی ابھی صرف
+          اتھارائزیشن ہوتی ہے اور ادائیگی صرف سیشن مکمل ہونے کے بعد کی جاتی
+          ہے — ہماری پریکٹس پالیسی کے مطابق۔
+        </p>
+      </aside>
+
+      {/* Right — dynamic stage container */}
+      <div className="min-h-[420px] rounded-2xl border border-black/[0.08] bg-white p-6 sm:p-8">
+        {stage === 1 && (
+          <div className="flex h-full flex-col">
+            <h3 className="font-display text-2xl text-[#5D1F13]">اپنا وقت منتخب کریں</h3>
+            <p className="mt-2 max-w-md text-sm leading-relaxed text-[#1A1A1A]/60">
+              اپنا پیکج اور کوئی کھلا وقت منتخب کریں — تمام اوقات وسطی امریکی
+              وقت (CST) میں دکھائے جاتے ہیں۔
+            </p>
+
+            {/* Package selection — single session vs 4-session bundle.
+                Compact content-driven cards (grid stretch keeps heights
+                equal); centered layout, no justify-between void. The
+                offer badge floats centered on the bundle card's top
+                border with pt clearance so it never touches the title. */}
+            <div className="mt-5 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="سیشن پیکج">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={pkg === "single"}
+                disabled={continuing}
+                onClick={() => setPkg("single")}
+                className={`flex h-full flex-col items-center justify-start rounded-xl border p-4 text-center transition-all ${
+                  pkg === "single"
+                    ? "border-[#5D1F13] bg-[#F3EDE5] shadow-[0_6px_20px_-12px_rgba(93,31,19,0.6)]"
+                    : "border-black/10 bg-white hover:border-[#A8532B]/40"
+                } disabled:pointer-events-none disabled:opacity-50`}
+              >
+                <span className="text-sm font-bold leading-snug text-[#1A1A1A]">
+                  سنگل سیشن
+                </span>
+                <span className="mt-1.5 max-w-[130px] text-xs leading-relaxed text-[#1A1A1A]/60">
+                  ایک 50 منٹ کا آن لائن سیشن
+                </span>
+                <span className="mt-3 font-display text-lg font-bold text-[#5D1F13]">
+                  ${(priceCentsFor("single") / 100).toFixed(2)}
+                </span>
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={pkg === "bundle4"}
+                disabled={continuing}
+                onClick={() => setPkg("bundle4")}
+                className={`relative flex h-full flex-col items-center justify-start rounded-xl border px-4 pb-4 pt-[18px] text-center transition-all ${
+                  pkg === "bundle4"
+                    ? "border-[#A8532B] bg-[#A8532B]/[0.07] shadow-[0_6px_20px_-12px_rgba(168,83,43,0.7)]"
+                    : "border-[#A8532B]/40 bg-white hover:border-[#A8532B]/70"
+                } disabled:pointer-events-none disabled:opacity-50`}
+              >
+                <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#A8532B] px-2 py-0.5 text-[9px] font-bold text-white shadow-sm">
+                  خصوصی پیش کش
+                </span>
+                <span className="text-sm font-bold leading-snug text-[#1A1A1A]">
+                  {BUNDLE4_LABEL}
+                </span>
+                <span className="mt-1.5 max-w-[130px] text-xs leading-relaxed text-[#1A1A1A]/60">
+                  {BUNDLE4_SESSIONS} آن لائن سیشن ($50 فی سیشن)
+                </span>
+                <span className="mt-3 font-display text-lg font-bold text-[#5D1F13]">
+                  ${(BUNDLE4_PRICE_CENTS / 100).toFixed(2)}
+                </span>
+                <span className="mt-0.5 text-[10px] text-[#1A1A1A]/45">
+                  کل
+                </span>
+              </button>
+            </div>
+
+            <div className="mt-6">
+              <CustomScheduler
+                selected={selected}
+                onSelect={setSelected}
+                onContinue={() => selected && createHold(selected)}
+                continuing={continuing}
+                error={holdError}
+              />
+            </div>
+          </div>
+        )}
+
+        {stage === 2 && (
+          <div className="flex h-full flex-col">
+            <h3 className="font-display text-2xl text-[#5D1F13]">آپ کی تفصیلات</h3>
+            <p className="mt-2 max-w-md text-sm leading-relaxed text-[#1A1A1A]/60">
+              صرف ضروری باتیں — پہلی گفتگو کے لیے ہم فارم کو آسان رکھتے ہیں۔
+            </p>
+            <div className="mt-6 space-y-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="bf-first"
+                    className="mb-2 block text-xs font-bold text-[#1A1A1A]/60"
+                  >
+                    پہلا نام
+                  </label>
+                  <input
+                    id="bf-first"
+                    type="text"
+                    autoComplete="given-name"
+                    required
+                    value={fields.firstName}
+                    onChange={(e) =>
+                      setFields((f) => ({ ...f, firstName: e.target.value }))
+                    }
+                    className="w-full rounded-md border border-black/10 bg-[#F3EDE5] px-4 py-3 text-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:border-[#A8532B] focus:outline-none focus:ring-1 focus:ring-[#A8532B]"
+                    placeholder="پہلا نام"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="bf-last"
+                    className="mb-2 block text-xs font-bold text-[#1A1A1A]/60"
+                  >
+                    آخری نام
+                  </label>
+                  <input
+                    id="bf-last"
+                    type="text"
+                    autoComplete="family-name"
+                    required
+                    value={fields.lastName}
+                    onChange={(e) =>
+                      setFields((f) => ({ ...f, lastName: e.target.value }))
+                    }
+                    className="w-full rounded-md border border-black/10 bg-[#F3EDE5] px-4 py-3 text-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:border-[#A8532B] focus:outline-none focus:ring-1 focus:ring-[#A8532B]"
+                    placeholder="آخری نام"
+                  />
+                </div>
+              </div>
+              <div>
+                <label
+                  htmlFor="bf-email"
+                  className="mb-2 block text-xs font-bold text-[#1A1A1A]/60"
+                >
+                  ای میل
+                </label>
+                <input
+                  id="bf-email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={fields.email}
+                  onChange={(e) =>
+                    setFields((f) => ({ ...f, email: e.target.value }))
+                  }
+                  className="w-full rounded-md border border-black/10 bg-[#F3EDE5] px-4 py-3 text-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:border-[#A8532B] focus:outline-none focus:ring-1 focus:ring-[#A8532B]"
+                  placeholder="you@example.com"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="bf-phone"
+                  className="mb-2 block text-xs font-bold text-[#1A1A1A]/60"
+                >
+                  فون نمبر
+                </label>
+                <input
+                  id="bf-phone"
+                  type="tel"
+                  autoComplete="tel"
+                  required
+                  value={fields.phone}
+                  onChange={(e) =>
+                    setFields((f) => ({ ...f, phone: e.target.value }))
+                  }
+                  className="w-full rounded-md border border-black/10 bg-[#F3EDE5] px-4 py-3 text-[#1A1A1A] placeholder:text-[#1A1A1A]/40 focus:border-[#A8532B] focus:outline-none focus:ring-1 focus:ring-[#A8532B]"
+                  placeholder="(555) 555-0100"
+                />
+              </div>
+            </div>
+
+            <div className="mt-8 flex items-center justify-between border-t border-black/[0.08] pt-6">
+              <button
+                type="button"
+                onClick={() => setStage(1)}
+                className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold text-[#1A1A1A]/60 transition-colors hover:text-[#1A1A1A]"
+              >
+                واپس
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (detailsValid) {
+                    trackEvent({
+                      action: "details_submitted",
+                      category: "booking",
+                      has_gclid: Boolean(document.cookie.match(/(?:^|;s*)tsm_attribution=[^}]*gclid/)),
+                    });
+                  }
+                  setStage(3);
+                }}
+                disabled={!detailsValid}
+                className="inline-flex items-center gap-2 rounded-full bg-[#5D1F13] px-6 py-3 text-sm font-bold text-[#F5EFE6] shadow-[0_6px_20px_-8px_rgba(93,31,19,0.7)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#4A1811] disabled:pointer-events-none disabled:opacity-40"
+              >
+                جائزہ لیں اور تصدیق کریں
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {stage === 3 && (
+          <div className="flex h-full flex-col">
+            <h3 className="font-display text-2xl text-[#5D1F13]">
+              جائزہ اور تصدیق
+            </h3>
+            <div className="mt-6 space-y-3 rounded-xl border border-black/[0.08] bg-[#F3EDE5] px-5 py-4 text-sm">
+              <p className="flex items-center justify-between gap-4">
+                <span className="inline-flex items-center gap-2 text-[#1A1A1A]/60">
+                  <CalendarDays className="h-4 w-4 text-[#A8532B]" aria-hidden="true" />
+                  تاریخ اور وقت
+                </span>
+                <span className="font-semibold text-[#1A1A1A]">
+                  {formatDateLong(chicagoDateOf(selected!.start))} ·{" "}
+                  {formatTimeIn(selected!.start)} وسطی امریکی وقت (CT)
+                </span>
+              </p>
+              <p className="flex items-center justify-between gap-4">
+                <span className="inline-flex items-center gap-2 text-[#1A1A1A]/60">
+                  <Clock className="h-4 w-4 text-[#A8532B]" aria-hidden="true" />
+                  دورانیہ / انداز
+                </span>
+                <span className="font-semibold text-[#1A1A1A]">
+                  50 منٹ · آن لائن ویڈیو
+                </span>
+              </p>
+              <p className="flex items-center justify-between gap-4">
+                <span className="text-[#1A1A1A]/60">پیکج</span>
+                <span className="font-semibold text-[#1A1A1A]">
+                  {pkg === "bundle4"
+                    ? `${BUNDLE4_LABEL} — $${(BUNDLE4_PRICE_CENTS / 100).toFixed(2)} کل`
+                    : "سنگل سیشن"}
+                </span>
+              </p>
+              <p className="flex items-center justify-between gap-4">
+                <span className="text-[#1A1A1A]/60">نام</span>
+                <span className="font-semibold text-[#1A1A1A]">
+                  {fields.firstName} {fields.lastName}
+                </span>
+              </p>
+              <p className="flex items-center justify-between gap-4">
+                <span className="text-[#1A1A1A]/60">ای میل</span>
+                <span className="font-semibold text-[#1A1A1A]">{fields.email}</span>
+              </p>
+              <p className="flex items-center justify-between gap-4">
+                <span className="text-[#1A1A1A]/60">فون</span>
+                <span className="font-semibold text-[#1A1A1A]">{fields.phone}</span>
+              </p>
+            </div>
+
+            <div className="mt-4">
+              <PromoCodeInput
+                promo={promo}
+                onApply={setPromo}
+                onClear={() => setPromo(null)}
+                priceCents={priceCentsFor(pkg)}
+              />
+            </div>
+
+            <CardOnFileStep
+              bookingId={hold!.booking_id}
+              holdExpiresAt={hold!.expires_at}
+              manageToken={hold!.manage_token}
+              packageId={pkg}
+              details={{
+                firstName: fields.firstName.trim(),
+                lastName: fields.lastName.trim(),
+                email: fields.email.trim(),
+                phone: fields.phone.trim(),
+              }}
+              slot={{
+                dateISO: chicagoDateOf(selected!.start),
+                slotCSTHour: chicagoHour(selected!.start),
+              }}
+              onConfirmed={(ref) => {
+                setBookingRef(ref);
+                setStage(4);
+              }}
+              onExpired={() => {
+                setHoldError(
+                  "اس وقت کی ریزرو حد ختم ہو گئی ہے۔ آگے بڑھنے کے لیے براہ کرم نیا وقت منتخب کریں۔",
+                );
+                setStage(1);
+                setSelected(null);
+                setHold(null);
+              }}
+              onBack={() => setStage(2)}
+            />
+          </div>
+        )}
+
+        {stage === 4 && selected && bookingRef && (
+          <BookingConfirmation
+            bookingReference={bookingRef}
+            slot={{
+              dateISO: chicagoDateOf(selected.start),
+              slotCSTHour: chicagoHour(selected.start),
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Chicago calendar date (YYYY-MM-DD) of a UTC instant. */
+function chicagoDateOf(instant: Date | string): string {
+  const d = typeof instant === "string" ? new Date(instant) : instant;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const get = (t: string) => parts.find((x) => x.type === t)?.value ?? "01";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+/** CST/CDT wall hour (0–23) of a UTC instant. */
+function chicagoHour(instant: Date | string): number {
+  const d = typeof instant === "string" ? new Date(instant) : instant;
+  return Number(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Chicago",
+      hour: "numeric",
+      hour12: false,
+    }).format(d),
+  );
+}

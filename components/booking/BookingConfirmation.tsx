@@ -1,0 +1,97 @@
+"use client";
+
+import { ArrowDownToLine, CalendarDays, CheckCircle2, Clock, MonitorPlay, UserRound } from "lucide-react";
+import { formatDateLong, formatTimeIn, slotInstant } from "./CustomScheduler";
+import { trackEvent } from "@/lib/analytics";
+
+/**
+ * Stage 4 — confirmation view: checkmark badge, booking details box,
+ * the .ics calendar download, and the card-on-file reassurance note.
+ * All times render in Central Time, the practice's single timezone.
+ */
+export default function BookingConfirmation({
+  bookingReference,
+  slot,
+}: {
+  bookingReference: string;
+  slot: { dateISO: string; slotCSTHour: number };
+}) {
+  const instant = slotInstant(slot.dateISO, slot.slotCSTHour);
+
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-5 text-center">
+      <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#5D1F13]">
+        <CheckCircle2 className="h-9 w-9 text-[#F5EFE6]" aria-hidden="true" />
+      </span>
+
+      <h3 className="font-display text-3xl text-[#5D1F13]">
+        آپ کی مشاورت محفوظ ہو گئی ہے
+      </h3>
+
+      <div className="w-full max-w-md space-y-2.5 rounded-xl border border-black/[0.08] bg-[#F3EDE5] px-5 py-4 text-sm">
+        <p className="flex items-center justify-between gap-4">
+          <span className="inline-flex items-center gap-2 text-[#1A1A1A]/60">
+            <CalendarDays className="h-4 w-4 text-[#A8532B]" aria-hidden="true" />
+            تاریخ
+          </span>
+          <span className="font-semibold text-[#1A1A1A]">
+            {formatDateLong(slot.dateISO)}
+          </span>
+        </p>
+        <p className="flex items-center justify-between gap-4">
+          <span className="inline-flex items-center gap-2 text-[#1A1A1A]/60">
+            <Clock className="h-4 w-4 text-[#A8532B]" aria-hidden="true" />
+            وقت
+          </span>
+          <span className="font-semibold text-[#1A1A1A]">
+            {formatTimeIn(instant)}{" "}
+            <span className="font-normal text-[#1A1A1A]/55">
+              وسطی امریکی وقت (CST)
+            </span>
+          </span>
+        </p>
+        <p className="flex items-center justify-between gap-4">
+          <span className="inline-flex items-center gap-2 text-[#1A1A1A]/60">
+            <Clock className="h-4 w-4 text-[#A8532B]" aria-hidden="true" />
+            دورانیہ
+          </span>
+          <span className="font-semibold text-[#1A1A1A]">50 منٹ</span>
+        </p>
+        <p className="flex items-center justify-between gap-4">
+          <span className="inline-flex items-center gap-2 text-[#1A1A1A]/60">
+            <UserRound className="h-4 w-4 text-[#A8532B]" aria-hidden="true" />
+            پریکٹیشنر
+          </span>
+          <span className="font-semibold text-[#1A1A1A]">
+            Fahd Alam — کوچ اور منتور
+          </span>
+        </p>
+        <p className="flex items-center justify-between gap-4">
+          <span className="inline-flex items-center gap-2 text-[#1A1A1A]/60">
+            <MonitorPlay className="h-4 w-4 text-[#A8532B]" aria-hidden="true" />
+            انداز
+          </span>
+          <span className="font-semibold text-[#1A1A1A]">
+            آن لائن ویڈیو مشاورت
+          </span>
+        </p>
+      </div>
+
+      <a
+        href={`/api/bookings/${encodeURIComponent(bookingReference)}/calendar`}
+        onClick={() =>
+          trackEvent({ action: "ics_downloaded", category: "engagement", booking_id: bookingReference })
+        }
+        className="inline-flex items-center gap-2 rounded-full bg-[#5D1F13] px-6 py-3 text-sm font-bold text-[#F5EFE6] shadow-[0_6px_20px_-8px_rgba(93,31,19,0.7)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#4A1811]"
+      >
+        <ArrowDownToLine className="h-4 w-4" aria-hidden="true" />
+        کیلنڈر میں شامل کریں (.ics)
+      </a>
+
+      <p className="max-w-md text-xs leading-relaxed text-[#1A1A1A]/55">
+        ایک کارڈ فائل پر رکھ دیا گیا ہے۔ آپ کی مشاورت کے بعد ہی کوئی چارج
+        کیا جائے گا۔
+      </p>
+    </div>
+  );
+}
