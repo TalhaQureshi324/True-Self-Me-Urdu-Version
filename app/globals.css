@@ -117,7 +117,25 @@ html[dir="rtl"] {
   color: var(--color-cream);
 }
 
-/* Hand-drawn underline used under display headings */
+/* RTL marquee: in RTL the strip is anchored at the right edge, so the LTR
+   keyframes (0 → -50%) drag it AWAY from the viewport and leave the screen
+   empty for most of the cycle. Slide rightward (0 → +50%) instead — the
+   duplicate row keeps the viewport covered at every frame. */
+@keyframes marquee-rtl {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(50%);
+  }
+}
+html[dir="rtl"] .animate-marquee {
+  animation-name: marquee-rtl;
+}
+
+/* Hand-drawn underline used under display headings. Extra bottom padding
+   drops the stroke into space below the Nastaliq descenders so it never
+   cuts through the glyphs. */
 .marker-underline {
   background-image: linear-gradient(
     to left,
@@ -126,7 +144,8 @@ html[dir="rtl"] {
   );
   background-repeat: no-repeat;
   background-size: 100% 0.14em;
-  background-position: 100% 92%;
+  background-position: 100% 100%;
+  padding-bottom: 0.22em;
 }
 
 /* ---------- Blog article body (CMS markdown) — brand typography ---------- */

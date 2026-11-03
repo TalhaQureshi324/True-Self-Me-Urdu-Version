@@ -125,7 +125,7 @@ export default function TherapyApproach() {
       >
         <h2
           className="font-display-snug self-center pr-[24px] font-display text-3xl font-normal leading-[1.2] tracking-normal text-cream md:text-5xl lg:text-6xl"
-          style={{ gridArea: "1 / 3 / 4 / 18" }}
+          style={{ gridArea: "1 / 3 / 5 / 18" }}
         >
           {approaches.bannerTitle}
         </h2>

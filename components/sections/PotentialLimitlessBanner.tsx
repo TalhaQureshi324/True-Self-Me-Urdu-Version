@@ -26,6 +26,7 @@ export default function PotentialLimitlessBanner() {
           width={1500}
           height={500}
           sizes="100vw"
+          priority
           className="block h-auto w-full min-h-[380px] scale-[1.08] object-cover md:min-h-[480px]"
         />
       </div>
@@ -40,10 +41,20 @@ export default function PotentialLimitlessBanner() {
         </defs>
       </svg>
 
-      {/* Top wave — specialties texture clipped to the curve */}
+      {/* Seam patch — unclipped olive band covering the section boundary.
+          The wave div's anti-aliased clip edge would otherwise blend with
+          the cream page body and read as a thin light line. */}
       <div
         aria-hidden="true"
-        className="absolute right-0 top-0 block h-[90px] w-full bg-[#605C31] bg-[url('/New%20images/areas_of_focus.png')] bg-repeat"
+        className="absolute right-0 -top-px block h-[6px] w-full bg-fixed bg-[#605C31] bg-[url('/New%20images/areas_of_focus.png')] bg-repeat"
+      />
+
+      {/* Top wave — specialties texture clipped to the curve. bg-fixed keeps
+          the tile phase identical to the section above, so no seam line
+          shows at the boundary. */}
+      <div
+        aria-hidden="true"
+        className="absolute right-0 -top-px block h-[90px] w-full bg-fixed bg-[#605C31] bg-[url('/New%20images/areas_of_focus.png')] bg-repeat"
         style={{ clipPath: "url(#mural-wave-clip)" }}
       />
 

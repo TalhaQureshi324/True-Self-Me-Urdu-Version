@@ -15,7 +15,7 @@ import { specialties } from "@/lib/content";
  */
 
 const TEXTURE =
-  "bg-[#605C31] bg-[url('/New%20images/areas_of_focus.png')] bg-repeat";
+  "bg-fixed bg-[#605C31] bg-[url('/New%20images/areas_of_focus.png')] bg-repeat";
 
 type Item = (typeof specialties.items)[number];
 
@@ -89,10 +89,10 @@ function Row({ item, flush }: { item: Item; flush?: boolean }) {
 function Ticker() {
   const row = (hidden: boolean) => (
     <div aria-hidden={hidden} className="flex shrink-0">
-      {Array.from({ length: 6 }).map((_, i) => (
+      {Array.from({ length: 12 }).map((_, i) => (
         <span
           key={i}
-          className="px-6 font-display text-6xl font-semibold uppercase tracking-wide text-[#F5EBE6] md:text-8xl lg:text-9xl"
+          className="px-6 font-display text-5xl font-semibold uppercase tracking-wide text-[#F5EBE6] md:text-7xl"
         >
           {specialties.marqueeWord}
         </span>
